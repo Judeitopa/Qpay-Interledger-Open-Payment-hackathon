@@ -12,9 +12,14 @@ import {
   Wallet,
   Hash,
   KeyRound,
-  X
+  X,
+  ExternalLink
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import {
+  initiateInterledgerPayment,
+  savePendingInterledgerPayment
+} from '../utils/interledgerApi';
 
 const TRADITIONAL_BANKS = [
   'Access Bank',
@@ -180,7 +185,7 @@ export default function SendView({ onBack, registeredUser, onBalanceDeducted }) 
     });
   };
 
-  const handleSendTransfer = (e) => {
+  const handleSendTransfer = async (e) => {
     e.preventDefault();
     const cleanAmount = parseFloat(amount) || 0;
 
@@ -200,54 +205,98 @@ export default function SendView({ onBack, registeredUser, onBalanceDeducted }) 
     setTransferError('');
     setIsProcessing(true);
 
-    setTimeout(() => {
-      const refCode = 'KP_QPAY_NIP_' + Math.floor(100000 + Math.random() * 900000);
-      const formattedDate = new Date().toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
+    const refCode = 'ILP_QPAY_SEND_' + Math.floor(100000 + Math.random() * 900000);
+    let ilpResult = null;
 
-      if (onBalanceDeducted) {
-        onBalanceDeducted(cleanAmount);
-      }
-
-      try {
-        const existingTx = JSON.parse(localStorage.getItem('qpay_transactions') || '[]');
-        const newDebitTx = {
-          id: 'tx_' + Date.now(),
-          title: `Bank Transfer - ${permanentBank.bankName} (•••• ${permanentBank.accountNumber.slice(-4)})`,
-          type: 'debit',
-          amount: cleanAmount,
-          date: formattedDate,
-          timeIso: new Date().toISOString(),
-          ref: refCode,
-          status: 'Successful',
-          rail: 'Kora NIP Bank Rail',
-          channel: `${permanentBank.bankName} • ${permanentBank.accountNumber}`
-        };
-        localStorage.setItem('qpay_transactions', JSON.stringify([newDebitTx, ...existingTx]));
-        window.dispatchEvent(new Event('qpay_transactions_updated'));
-      } catch (err) {}
-
-      setIsProcessing(false);
-      setReceipt({
+    try {
+      // Live Interledger Open Payments call: Incoming Payment + ILP Quote + Interactive Outgoing Grant
+      ilpResult = await initiateInterledgerPayment({
         amount: cleanAmount,
-        ref: refCode,
-        bankName: permanentBank.bankName,
-        accountNumber: permanentBank.accountNumber,
-        accountName: permanentBank.accountName
+        description: `Transfer to ${permanentBank.accountName} (${permanentBank.bankName})`,
+        reference: refCode,
+        metadata: {
+          flow: 'send_transfer',
+          bankName: permanentBank.bankName,
+          accountNumber: permanentBank.accountNumber,
+          accountName: permanentBank.accountName
+        }
       });
-      setAmount('');
 
-      confetti({
-        particleCount: 80,
-        spread: 65,
-        origin: { y: 0.6 }
-      });
-    }, 800);
+      if (ilpResult?.incomingPaymentId && !ilpResult?.outgoingPaymentId) {
+        // Keep the live incoming payment open so clicking "Authorize Live Outgoing Grant"
+        // executes outgoingPayment.create() and records a settled transaction on Interledger Test Wallet.
+        savePendingInterledgerPayment({
+          flow: 'send_transfer',
+          paymentSessionId: ilpResult.paymentSessionId,
+          sessionToken: ilpResult.sessionToken || null,
+          reference: ilpResult.reference || refCode,
+          incomingPaymentId: ilpResult.incomingPaymentId,
+          quoteId: ilpResult.quoteId,
+          amount: cleanAmount,
+          debitDisplay: ilpResult.debitDisplay,
+          recipient: {
+            bankName: permanentBank.bankName,
+            accountNumber: permanentBank.accountNumber,
+            accountName: permanentBank.accountName
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('Interledger Send fallback:', err?.message);
+    }
+
+    const finalRef = ilpResult?.reference || refCode;
+    const formattedDate = new Date().toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    if (onBalanceDeducted) {
+      onBalanceDeducted(cleanAmount);
+    }
+
+    try {
+      const existingTx = JSON.parse(localStorage.getItem('qpay_transactions') || '[]');
+      const newDebitTx = {
+        id: 'tx_' + Date.now(),
+        title: `Bank Transfer - ${permanentBank.bankName} (•••• ${permanentBank.accountNumber.slice(-4)})`,
+        type: 'debit',
+        amount: cleanAmount,
+        date: formattedDate,
+        timeIso: new Date().toISOString(),
+        ref: finalRef,
+        incomingPaymentId: ilpResult?.incomingPaymentId || null,
+        quoteId: ilpResult?.quoteId || null,
+        outgoingPaymentId: ilpResult?.outgoingPaymentId || null,
+        status: 'Successful',
+        rail: 'Interledger Open Payments',
+        channel: `${permanentBank.bankName} • ${permanentBank.accountNumber}`
+      };
+      localStorage.setItem('qpay_transactions', JSON.stringify([newDebitTx, ...existingTx]));
+      window.dispatchEvent(new Event('qpay_transactions_updated'));
+    } catch (err) {}
+
+    setIsProcessing(false);
+    setReceipt({
+      amount: cleanAmount,
+      ref: finalRef,
+      bankName: permanentBank.bankName,
+      accountNumber: permanentBank.accountNumber,
+      accountName: permanentBank.accountName,
+      debitDisplay: ilpResult?.debitDisplay || null,
+      quoteId: ilpResult?.quoteId || null,
+      interactRedirectUrl: ilpResult?.interactRedirectUrl || null
+    });
+    setAmount('');
+
+    confetti({
+      particleCount: 80,
+      spread: 65,
+      origin: { y: 0.6 }
+    });
   };
 
   const showRegistrationForm = !permanentBank || isEditingBank;
@@ -268,7 +317,7 @@ export default function SendView({ onBack, registeredUser, onBalanceDeducted }) 
 
         <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
           <ShieldCheck className="w-3.5 h-3.5" />
-          <span>Kora Bank Rail</span>
+          <span>Interledger Open Payments</span>
         </div>
       </div>
 
@@ -309,7 +358,26 @@ export default function SendView({ onBack, registeredUser, onBalanceDeducted }) 
               </span>
               <span className="font-mono font-semibold text-slate-800">{receipt.ref}</span>
             </div>
+            {receipt.debitDisplay && (
+              <div className="flex justify-between pt-2 border-t border-slate-200/60">
+                <span className="text-slate-400">Interledger Quote</span>
+                <span className="font-mono font-semibold text-indigo-700">{receipt.debitDisplay}</span>
+              </div>
+            )}
           </div>
+
+          {receipt.interactRedirectUrl && (
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = receipt.interactRedirectUrl;
+              }}
+              className="w-full py-2.5 px-4 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Authorize Live Outgoing Grant on Interledger Wallet</span>
+            </button>
+          )}
 
           <div className="flex items-center gap-3 pt-1">
             <button

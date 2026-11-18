@@ -175,7 +175,7 @@ export default function TransactionHistoryView({
 
         <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
           <ShieldCheck className="w-3.5 h-3.5" />
-          <span>Verified Kora Rail</span>
+          <span>Verified Interledger Rail</span>
         </div>
       </div>
 
@@ -407,7 +407,7 @@ export default function TransactionHistoryView({
                   <CreditCard className="w-3 h-3" /> Payment Rail
                 </span>
                 <span className="font-medium text-slate-800">
-                  {selectedTransaction.rail || 'Kora Rail'}
+                  {selectedTransaction.rail || 'Interledger Open Payments'}
                 </span>
               </div>
 
@@ -418,6 +418,15 @@ export default function TransactionHistoryView({
                   </span>
                   <span className="font-medium text-slate-800">
                     {selectedTransaction.channel}
+                  </span>
+                </div>
+              )}
+
+              {(selectedTransaction.outgoingPaymentId || selectedTransaction.incomingPaymentId) && (
+                <div className="flex justify-between pb-2 border-b border-slate-200/60 gap-3">
+                  <span className="text-slate-400 flex-shrink-0">Open Payments ID</span>
+                  <span className="font-mono text-[11px] font-semibold text-indigo-700 truncate max-w-[180px]">
+                    {(selectedTransaction.outgoingPaymentId || selectedTransaction.incomingPaymentId).split('/').pop()}
                   </span>
                 </div>
               )}

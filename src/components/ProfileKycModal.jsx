@@ -65,7 +65,7 @@ export default function ProfileKycModal({ isOpen, onClose, registeredUser, onUse
 
       onUserUpdated(updatedUser);
       setIsVerifying(false);
-      setVerificationSuccess('Identity verified via Kora Identity Rail! Upgraded to Tier 2 (₦500,000/day).');
+      setVerificationSuccess('Identity verified via Interledger Open Payments Rail! Upgraded to Tier 2 (₦500,000/day).');
 
       confetti({
         particleCount: 70,
@@ -118,7 +118,7 @@ export default function ProfileKycModal({ isOpen, onClose, registeredUser, onUse
 
       onUserUpdated(updatedUser);
       setIsVerifying(false);
-      setVerificationSuccess('CAC Business Certificate verified via Corporate Affairs Commission & Kora! Upgraded to Tier 2 (₦5,000,000/day).');
+      setVerificationSuccess('CAC Business Certificate verified via Corporate Affairs Commission & Interledger Rail! Upgraded to Tier 2 (₦5,000,000/day).');
 
       confetti({
         particleCount: 80,
@@ -361,7 +361,7 @@ export default function ProfileKycModal({ isOpen, onClose, registeredUser, onUse
                     className="w-full py-2.5 px-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-sm"
                   >
                     {isVerifying ? (
-                      <span>Verifying CAC Certificate with Kora Rails...</span>
+                      <span>Verifying CAC Certificate...</span>
                     ) : (
                       <>
                         <Upload className="w-3.5 h-3.5" />
@@ -393,7 +393,7 @@ export default function ProfileKycModal({ isOpen, onClose, registeredUser, onUse
                     disabled={isVerifying}
                     className="w-full py-2 px-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold transition"
                   >
-                    {isVerifying ? 'Verifying with NIBSS / Kora...' : 'Verify & Unlock Tier 2'}
+                    {isVerifying ? 'Verifying Identity...' : 'Verify & Unlock Tier 2'}
                   </button>
                 </form>
               )
@@ -530,7 +530,7 @@ export default function ProfileKycModal({ isOpen, onClose, registeredUser, onUse
         {/* Security Footer */}
         <div className="p-3 bg-[#F8FAFD] border border-slate-200/80 rounded-2xl flex items-center gap-2 text-[11px] text-slate-500">
           <ShieldCheck className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-          <span>Data verified through Kora licensed identity & CAC verification infrastructure.</span>
+          <span>Data verified through Qpay & Interledger Open Payments compliance infrastructure.</span>
         </div>
 
         {/* Account Logout Action */}

@@ -1,6 +1,6 @@
 # Qpay
 
-A peer-to-peer (P2P) and merchant QR payment web application built with React, Vite, and Tailwind CSS. Qpay enables instant scan-to-pay transactions between individuals and businesses, itemized merchant billing, customer loyalty tracking with PDF exports, and monthly business performance analytics with a simulated Kora payment gateway integration.
+A peer-to-peer (P2P) and merchant QR payment web application built with React, Vite, Tailwind CSS, and an Interledger Open Payments Node.js backend. Qpay enables instant scan-to-pay transactions between individuals and businesses, itemized merchant billing, customer loyalty tracking with PDF exports, and monthly business performance analytics powered by live Interledger Open Payments API rails.
 
 ---
 
@@ -37,7 +37,7 @@ Qpay is designed to streamline cash-less payments in retail, dining, and daily p
 ## Key Features
 
 ### Individual Accounts
-- **Digital Wallet:** Real-time Naira balance tracking with quick top-up simulated via Kora checkout (Card, Bank Transfer, USSD).
+- **Digital Wallet:** Real-time Naira balance tracking with instant wallet top-up routed through Interledger Open Payments incoming payment rails.
 - **Send Money:** Transfer to registered users via phone number, Qpay tag, or direct account search.
 - **Receive via QR:** Generate static or custom-amount QR codes for contactless incoming payments.
 - **Transaction History:** Filterable ledger of credits and debits with detailed receipts and reference numbers.
@@ -62,7 +62,7 @@ Qpay is designed to streamline cash-less payments in retail, dining, and daily p
 ### Security & Risk Controls
 - **Transaction & Daily Limits:** Tiered spending caps based on verification status.
 - **Duplicate Prevention:** Idempotency checks to prevent accidental double-taps on payments.
-- **Kora Vault Simulation:** Mock escrow ledger ensuring balance consistency across debits and credits.
+- **Interledger Open Payments Vault:** Ed25519 HTTP-signed Open Payments backend handling wallet resolution, incoming payments, ILP quotes, and interactive GNAP outgoing payment grants.
 
 ---
 
@@ -78,7 +78,8 @@ Qpay is designed to streamline cash-less payments in retail, dining, and daily p
 | **QR Code Scanning** | `html5-qrcode` |
 | **Visual Effects** | `canvas-confetti` |
 | **PDF Generation** | Native A4 Printable Window / Blob Generator |
-| **Routing / Hosting** | Single-Page Application (SPA) with Vercel rewrites |
+| **Payment Rail** | [Interledger Open Payments](https://openpayments.dev/) (`@interledger/open-payments`) |
+| **Routing / Hosting** | Single-Page Application (SPA) with Vercel API & SPA rewrites |
 
 ---
 
@@ -86,11 +87,13 @@ Qpay is designed to streamline cash-less payments in retail, dining, and daily p
 
 ```text
 Q-PAY/
+├── api/                    # Vercel serverless functions for Interledger Open Payments
+├── server/                 # Node.js Interledger Open Payments backend service & router
 ├── public/                 # Static assets
 ├── src/
 │   ├── assets/             # Brand logos and images
 │   ├── components/         # Reusable UI and view components
-│   │   ├── AddMoneyModal.jsx           # Kora top-up checkout modal
+│   │   ├── AddMoneyModal.jsx           # Interledger Open Payments top-up modal
 │   │   ├── BalanceDashboard.jsx        # Individual wallet overview
 │   │   ├── BusinessPerformanceTab.jsx  # Sales analytics & product donut chart
 │   │   ├── CustomerLeaderboardTab.jsx  # Customer rankings & PDF exports
@@ -100,8 +103,9 @@ Q-PAY/
 │   │   ├── SendView.jsx                # P2P payment flow & PIN check
 │   │   └── ...
 │   ├── utils/              # Helper utilities
-│   │   ├── korapayVault.js             # Simulated ledger & wallet engine
-│   │   ├── paymentSync.js              # Real-time tab/device synchronization
+│   │   ├── interledgerApi.js           # Frontend client for /api/interledger/*
+│   │   ├── interledgerVault.js         # Zero-digit tag & wallet identity vault
+│   │   ├── paymentSync.js              # Real-time Open Payments & device sync
 │   │   ├── pdfExport.js                # A4 PDF exporter for dossiers & reports
 │   │   └── soundEffects.js             # Payment success audio cues
 │   ├── App.jsx             # Root application controller & navigation

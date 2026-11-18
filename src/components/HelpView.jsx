@@ -14,7 +14,7 @@ import {
 const FAQS = [
   {
     q: 'How do bank transfers on the Send page work?',
-    a: 'For account safety, Qpay lets you permanently register one traditional Nigerian bank account on the Send tab. Once registered, you can transfer funds from your Qpay balance directly to that bank account anytime via Kora NIP rails.'
+    a: 'For account safety, Qpay lets you permanently register one traditional Nigerian bank account on the Send tab. Once registered, you can transfer funds from your Qpay balance directly to that account anytime via Interledger Open Payments rails.'
   },
   {
     q: 'How do I pay a business or merchant with Scan to Pay?',
@@ -62,7 +62,7 @@ export default function HelpView({ onBack, registeredUser }) {
 
         <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
           <ShieldCheck className="w-3.5 h-3.5" />
-          <span>24/7 Kora Help Desk</span>
+          <span>24/7 Qpay Help Desk</span>
         </div>
       </div>
 

@@ -1,5 +1,16 @@
-import React, { useState } from 'react';
-import { Eye, EyeOff, ShieldCheck, Wallet, Plus, ChevronRight, TrendingUp, Receipt } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Eye, EyeOff, ShieldCheck, Wallet, Plus, ChevronRight, ChevronDown, TrendingUp, Receipt, Check } from 'lucide-react';
+
+const CURRENCY_OPTIONS = [
+  { shortCode: 'NG', assetCode: 'NGN', symbol: '₦' },
+  { shortCode: 'US', assetCode: 'USD', symbol: '$' },
+  { shortCode: 'EU', assetCode: 'EUR', symbol: '€' },
+  { shortCode: 'GB', assetCode: 'GBP', symbol: '£' },
+  { shortCode: 'ZA', assetCode: 'ZAR', symbol: 'R' },
+  { shortCode: 'MX', assetCode: 'MXN', symbol: 'MX$' },
+  { shortCode: 'KE', assetCode: 'KES', symbol: 'KSh' },
+  { shortCode: 'CA', assetCode: 'CAD', symbol: 'CA$' }
+];
 
 export default function BalanceDashboard({ 
   registeredUser, 
@@ -9,8 +20,44 @@ export default function BalanceDashboard({
   customerPaymentsTotal = 0 
 }) {
   const [showBalance, setShowBalance] = useState(true);
+  const [currencyMenuOpen, setCurrencyMenuOpen] = useState(false);
+  const [incomingNotice, setIncomingNotice] = useState('');
+  const dropdownRef = useRef(null);
+  const noticeTimerRef = useRef(null);
   const isIndividual = registeredUser?.type !== 'business';
   const tier = registeredUser?.tier || 1;
+
+  useEffect(() => {
+    return () => {
+      if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!currencyMenuOpen) return;
+    const handleOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setCurrencyMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [currencyMenuOpen]);
+
+  const handleCurrencySelect = (curr) => {
+    if (curr.assetCode === 'NGN') {
+      setIncomingNotice('');
+      setCurrencyMenuOpen(false);
+      return;
+    }
+
+    setIncomingNotice('Incoming feature');
+    setCurrencyMenuOpen(false);
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    noticeTimerRef.current = setTimeout(() => {
+      setIncomingNotice('');
+    }, 2500);
+  };
 
   // For Business, total customer payments received reflects in total balance dashboard
   const balanceAmount = isIndividual
@@ -37,14 +84,16 @@ export default function BalanceDashboard({
   return (
     <div className="w-full max-w-xl mx-auto mb-8 animate-fadeIn">
       {/* 1. Main Available Balance Card (Original Layout Preserved) */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] p-6 sm:p-7 relative overflow-hidden">
+      <div className="bg-white rounded-3xl border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] p-6 sm:p-7 relative">
         
         {/* Subtle decorative background gradient */}
-        <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-indigo-50/70 to-transparent rounded-bl-full pointer-events-none" />
+        <div className="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-indigo-50/70 to-transparent rounded-bl-full" />
+        </div>
 
         <div className="relative z-10 space-y-4">
           
-          {/* Top Row: Label, Eye toggle, Account Type Tag + Add Money Button */}
+          {/* Top Row: Label, Tiny NG Currency Dropdown, Eye toggle, Account Type Tag */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-xl bg-[#EEF2FF] text-[#4F46E5] flex items-center justify-center">
@@ -53,6 +102,70 @@ export default function BalanceDashboard({
               <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
                 Available Balance
               </span>
+
+              {/* Tiny NG Currency Pill with Hover Dropdown */}
+              <div
+                ref={dropdownRef}
+                className="relative inline-flex items-center"
+                onMouseEnter={() => setCurrencyMenuOpen(true)}
+                onMouseLeave={() => setCurrencyMenuOpen(false)}
+              >
+                <button
+                  type="button"
+                  onClick={() => setCurrencyMenuOpen((prev) => !prev)}
+                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 text-[10px] font-bold tracking-wide transition cursor-pointer leading-none"
+                  aria-haspopup="listbox"
+                  aria-expanded={currencyMenuOpen}
+                >
+                  <span>NG</span>
+                  <ChevronDown className={`w-2.5 h-2.5 transition-transform ${currencyMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {currencyMenuOpen && (
+                  <div className="absolute left-0 top-full pt-1.5 z-50">
+                    <div
+                      role="listbox"
+                      className="w-44 bg-white border border-slate-200/90 rounded-xl shadow-xl py-1 animate-fadeIn"
+                    >
+                      {CURRENCY_OPTIONS.map((curr) => {
+                        const isNaira = curr.assetCode === 'NGN';
+                        return (
+                          <button
+                            key={curr.assetCode}
+                            type="button"
+                            role="option"
+                            aria-selected={isNaira}
+                            onClick={() => handleCurrencySelect(curr)}
+                            className={`w-full px-3 py-1.5 text-left flex items-center justify-between gap-2 text-xs transition cursor-pointer ${
+                              isNaira
+                                ? 'bg-indigo-50/80 text-indigo-700 font-semibold'
+                                : 'text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="inline-flex items-center justify-center w-6 px-1 py-0.5 rounded bg-slate-100 text-[10px] font-bold text-slate-700 flex-shrink-0">
+                                {curr.shortCode}
+                              </span>
+                              <div className="truncate">
+                                <span className="font-semibold">{curr.assetCode}</span>
+                                <span className="text-[10px] text-slate-400 ml-1">{curr.symbol}</span>
+                              </div>
+                            </div>
+                            {isNaira && <Check className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {incomingNotice && (
+                  <div className="absolute left-0 top-full mt-1.5 z-50 whitespace-nowrap px-2.5 py-1 rounded-lg bg-slate-900 text-white text-[11px] font-medium shadow-lg animate-fadeIn">
+                    {incomingNotice}
+                  </div>
+                )}
+              </div>
+
               <button
                 type="button"
                 onClick={() => setShowBalance(!showBalance)}
@@ -80,7 +193,7 @@ export default function BalanceDashboard({
               <div className="flex items-center gap-2 flex-wrap mt-1">
                 <p className="text-xs text-slate-400 flex items-center gap-1.5">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>Secured by Kora Rails</span>
+                  <span>Powered by Interledger Open Payments</span>
                 </p>
 
                 {/* For Business: Reflect total customer payments received */}

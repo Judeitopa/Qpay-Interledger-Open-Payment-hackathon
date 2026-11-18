@@ -92,7 +92,7 @@ export default function LoginView({
           ) : null}
           <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
             <ShieldCheck className="w-4 h-4 text-emerald-500" />
-            <span className="hidden sm:inline">Secure Kora Login</span>
+            <span className="hidden sm:inline">Secure Interledger Login</span>
           </div>
         </div>
       </header>
@@ -235,7 +235,7 @@ export default function LoginView({
           <div className="pt-2 border-t border-slate-100 text-center">
             <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-400">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Protected by Kora Infrastructure • 256-bit Secure Encryption</span>
+              <span>Powered by Interledger Open Payments • 256-bit Secure Encryption</span>
             </span>
           </div>
 
@@ -244,7 +244,7 @@ export default function LoginView({
 
       {/* Footer */}
       <footer className="w-full py-4 text-center text-xs text-slate-400 border-t border-slate-100 bg-white">
-        © 2026 Qpay Africa • Kora Infrastructure
+        © 2026 Qpay Africa • Powered by Interledger Open Payments
       </footer>
 
     </div>

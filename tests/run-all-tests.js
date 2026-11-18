@@ -12,6 +12,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const testFiles = [
   'tests/crossDevicePayment.test.js',
   'tests/korapayVault.test.js',
+  'tests/interledgerOpenPayments.test.js',
   'tests/securityAndLimits.test.js',
   'tests/loginAuthentication.test.js'
 ];

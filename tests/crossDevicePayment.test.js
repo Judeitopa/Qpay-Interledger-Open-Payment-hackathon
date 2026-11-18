@@ -1,6 +1,6 @@
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseKorapayQrData } from '../src/utils/korapayApi.js';
+import { parseInterledgerQrData } from '../src/utils/interledgerApi.js';
 import { createPaymentInvoice, applyIncomingPaymentCredit } from '../src/utils/paymentSync.js';
 
 // Mock localStorage for Node test environment
@@ -28,7 +28,8 @@ describe('Cross-Device QR Payment Architecture Tests', () => {
       name: 'Dr. Chidi Obi',
       qpayTag: '@chidi',
       accountNumber: '0284918231',
-      bankName: 'Kora / Wema Bank',
+      bankName: 'Interledger Open Payments',
+      walletAddress: 'https://ilp.interledger-test.dev/qpay',
       balance: 10000
     };
 
@@ -38,11 +39,11 @@ describe('Cross-Device QR Payment Architecture Tests', () => {
       note: 'Medical Consulting'
     });
 
-    assert.ok(invoiceResult.reference.startsWith('KP_QPAY_'), 'Reference must follow Kora Qpay pattern');
+    assert.ok(invoiceResult.reference.startsWith('ILP_QPAY_'), 'Reference must follow Interledger Qpay pattern');
     assert.ok(invoiceResult.qrPayload, 'QR payload must be generated');
 
     // Parse the payload back to verify QR integrity
-    const parsed = parseKorapayQrData(invoiceResult.qrPayload);
+    const parsed = parseInterledgerQrData(invoiceResult.qrPayload);
     assert.strictEqual(parsed.accountName, 'Dr. Chidi Obi');
     assert.strictEqual(parsed.qpayTag, '@chidi');
     assert.strictEqual(parsed.amount, '7500');
@@ -52,24 +53,27 @@ describe('Cross-Device QR Payment Architecture Tests', () => {
   it('2. Device A scans QR and parses recipient handle and exact payment amount', () => {
     const rawQrString = JSON.stringify({
       app: 'Qpay',
-      type: 'korapay_invoice',
+      type: 'interledger_invoice',
       syncId: 'sync_test_88192',
-      ref: 'KP_QPAY_991823',
+      ref: 'ILP_QPAY_991823',
+      walletAddress: 'https://ilp.interledger-test.dev/qpay',
+      paymentPointer: '$ilp.interledger-test.dev/qpay',
       accountNumber: '0284918231',
       accountName: 'Fatima Bello',
       qpayTag: '@fatima',
-      bankName: 'Kora / Wema Bank',
+      bankName: 'Interledger Open Payments',
       amount: '12500',
       currency: 'NGN'
     });
 
-    const invoice = parseKorapayQrData(rawQrString);
+    const invoice = parseInterledgerQrData(rawQrString);
     assert.ok(invoice, 'Invoice must be parsed from JSON payload');
     assert.strictEqual(invoice.syncId, 'sync_test_88192');
     assert.strictEqual(invoice.qpayTag, '@fatima');
     assert.strictEqual(invoice.accountName, 'Fatima Bello');
     assert.strictEqual(invoice.amount, '12500');
-    assert.strictEqual(invoice.reference, 'KP_QPAY_991823');
+    assert.strictEqual(invoice.reference, 'ILP_QPAY_991823');
+    assert.strictEqual(invoice.walletAddress, 'https://ilp.interledger-test.dev/qpay');
   });
 
   it('3. Double-entry ledger: Payer balance deducted and Recipient balance credited', () => {

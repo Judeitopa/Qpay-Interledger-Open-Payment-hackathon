@@ -21,8 +21,16 @@ import SettingsView from './components/SettingsView';
 import HelpView from './components/HelpView';
 import IndividualNav from './components/IndividualNav';
 import AiAssistantChat from './components/AiAssistantChat';
-import { checkKorapayInstallation } from './utils/deviceCheck';
-import { getStoredKorapayUser, setStoredKorapayUser } from './utils/korapayApi';
+import { checkInterledgerWalletReady } from './utils/deviceCheck';
+import {
+  getStoredInterledgerUser,
+  setStoredInterledgerUser,
+  finalizeInterledgerPayment,
+  getPendingInterledgerPayment,
+  clearPendingInterledgerPayment
+} from './utils/interledgerApi';
+import { completePaymentInvoice } from './utils/paymentSync';
+import confetti from 'canvas-confetti';
 import { playRobloxClickSound } from './utils/soundEffects';
 import { persistActiveSession, clearActiveSession, hasRegisteredAccount } from './utils/accountStorage';
 import { resolveUserAvatar, DEFAULT_UNISEX_AVATAR } from './utils/avatar';
@@ -65,16 +73,19 @@ export default function App() {
   const [showCameraPermissionModal, setShowCameraPermissionModal] = useState(false);
   const [actionAttempted, setActionAttempted] = useState('');
 
-  // Korapay Connection State
+  // Interledger Connection State
   const [connectedUser, setConnectedUser] = useState(() => {
-    return getStoredKorapayUser();
+    return getStoredInterledgerUser();
   });
 
-  // Korapay installation status state
-  const [korapayInstalled, setKorapayInstalled] = useState(() => {
-    const saved = localStorage.getItem('qpay_korapay_installed');
-    return saved === 'true';
+  // Interledger Wallet Ready state
+  const [interledgerReady, setInterledgerReady] = useState(() => {
+    const saved = localStorage.getItem('qpay_interledger_wallet_ready');
+    return saved !== 'false';
   });
+
+  // Banner shown after returning from Interledger Test Wallet interactive grant redirect
+  const [ilpSettlementNotice, setIlpSettlementNotice] = useState(null);
 
   // Calculate total customer payments received to reflect in total balance dashboard
   const [customerPaymentsTotal, setCustomerPaymentsTotal] = useState(() => {
@@ -167,8 +178,112 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('qpay_korapay_installed', korapayInstalled.toString());
-  }, [korapayInstalled]);
+    localStorage.setItem('qpay_interledger_wallet_ready', interledgerReady.toString());
+  }, [interledgerReady]);
+
+  // Handle Interledger Open Payments interactive grant callback redirect (?ilp_session=...&interact_ref=...)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const paymentSessionId = params.get('ilp_session');
+    const interactRef = params.get('interact_ref');
+    if (!paymentSessionId || !interactRef) return;
+
+    // Immediately clean query parameters so refresh does not re-trigger
+    const cleanUrl = window.location.pathname;
+    window.history.replaceState({}, document.title, cleanUrl);
+
+    const finalizeCallback = async () => {
+      try {
+        const pending = getPendingInterledgerPayment();
+        const result = await finalizeInterledgerPayment({
+          paymentSessionId,
+          interactRef,
+          sessionToken: pending?.sessionToken || undefined
+        });
+
+        const settledAmount = Number(pending?.amount || result?.amountNgn || 0);
+        const ref = result?.reference || pending?.reference || ('ILP_QPAY_' + Date.now());
+
+        // If this was a Scan-to-Pay interactive authorization, deduct balance & log transaction
+        if (pending?.flow === 'scan_to_pay' && settledAmount > 0) {
+          setRegisteredUser((prev) => {
+            if (!prev) return prev;
+            const updated = {
+              ...prev,
+              balance: Math.max(0, Number(prev.balance || 0) - settledAmount)
+            };
+            localStorage.setItem('qpay_registered_user', JSON.stringify(updated));
+            persistActiveSession();
+            return updated;
+          });
+
+          try {
+            const existingTx = JSON.parse(localStorage.getItem('qpay_transactions') || '[]');
+            const alreadyLogged = existingTx.some((t) => t.ref === ref);
+            if (!alreadyLogged) {
+              const newTx = {
+                id: 'tx_ilp_' + Date.now(),
+                title: 'Payment to ' + (pending?.invoice?.accountName || 'Interledger Merchant'),
+                type: 'debit',
+                amount: settledAmount,
+                date: new Date().toLocaleDateString('en-GB', {
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                }),
+                timeIso: new Date().toISOString(),
+                ref,
+                incomingPaymentId: result?.incomingPaymentId || pending?.incomingPaymentId || null,
+                quoteId: result?.quoteId || pending?.quoteId || null,
+                outgoingPaymentId: result?.outgoingPaymentId || null,
+                status: 'Successful',
+                rail: 'Interledger Open Payments'
+              };
+              localStorage.setItem('qpay_transactions', JSON.stringify([newTx, ...existingTx]));
+              window.dispatchEvent(new Event('qpay_transactions_updated'));
+            }
+          } catch {}
+
+          // Complete cross-device sync notice for receiver
+          try {
+            const activeUser = JSON.parse(localStorage.getItem('qpay_registered_user') || 'null');
+            await completePaymentInvoice({
+              syncId: pending?.invoice?.syncId,
+              reference: ref,
+              incomingPaymentId: result?.incomingPaymentId,
+              outgoingPaymentId: result?.outgoingPaymentId,
+              quoteId: result?.quoteId,
+              amount: settledAmount,
+              payerUser: activeUser,
+              recipientData: pending?.invoice
+            });
+          } catch {}
+        }
+
+        clearPendingInterledgerPayment();
+        setIlpSettlementNotice({
+          status: 'success',
+          message: `Interledger Open Payments transfer authorized & settled (${result?.debitDisplay || 'Live Outgoing Payment'})`,
+          outgoingPaymentId: result?.outgoingPaymentId,
+          reference: ref
+        });
+
+        try {
+          confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+        } catch {}
+      } catch (err) {
+        setIlpSettlementNotice({
+          status: 'error',
+          message: err?.message || 'Could not finalize Interledger Open Payments grant.'
+        });
+      }
+    };
+
+    finalizeCallback();
+  }, []);
 
   // Global listener for cross-device balance credits & multi-tab synchronizations
   useEffect(() => {
@@ -289,7 +404,7 @@ export default function App() {
   };
 
   const handleSimulateInstalled = () => {
-    setKorapayInstalled(true);
+    setInterledgerReady(true);
     setShowInstallModal(false);
     
     if (actionAttempted === 'Scan to Pay') {
@@ -301,7 +416,7 @@ export default function App() {
 
   const handleConnectedSuccess = (user) => {
     setConnectedUser(user);
-    setStoredKorapayUser(user);
+    setStoredInterledgerUser(user);
   };
 
   const sanitizeAuthType = (t) => {
@@ -424,6 +539,34 @@ export default function App() {
 
       {/* Main Content Area - Full Width Web Layout */}
       <main className="flex-1 flex flex-col items-center justify-start p-6">
+        {ilpSettlementNotice && (
+          <div
+            className={`w-full max-w-xl mb-4 p-3.5 rounded-2xl border text-xs flex items-center justify-between gap-3 shadow-sm animate-fadeIn ${
+              ilpSettlementNotice.status === 'success'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                : 'bg-rose-50 border-rose-200 text-rose-800'
+            }`}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <ShieldCheck className="w-4 h-4 flex-shrink-0" />
+              <div className="truncate">
+                <span className="font-semibold block">{ilpSettlementNotice.message}</span>
+                {ilpSettlementNotice.outgoingPaymentId && (
+                  <span className="font-mono text-[11px] opacity-80 block truncate">
+                    Ref: {ilpSettlementNotice.reference}
+                  </span>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIlpSettlementNotice(null)}
+              className="px-2.5 py-1 rounded-lg bg-white/70 hover:bg-white text-[11px] font-semibold cursor-pointer flex-shrink-0"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
         
         {currentView === 'home' && (
           <div className="w-full max-w-4xl flex flex-col items-center justify-center animate-fadeIn">
@@ -438,7 +581,7 @@ export default function App() {
                 <p className="text-xs sm:text-sm text-slate-500 mt-1 text-center max-w-lg mx-auto">
                   {isBusiness 
                     ? 'Business Terminal • Manage sales, inventory and incoming customer payments'
-                    : 'Individual Account • Instant contactless QR payments powered by Kora rails'}
+                    : 'Individual Account • Instant contactless QR payments powered by Interledger Open Payments'}
                 </p>
               </div>
             </div>
@@ -756,7 +899,7 @@ export default function App() {
       {!isBusiness ? (
         <footer className="w-full mt-auto py-6 px-6 sm:px-12 border-t border-slate-200/60 bg-white/50 flex items-center justify-between gap-4">
           <p className="text-[11px] text-slate-400">
-            Qpay Africa • Secured by Kora Rails
+            Qpay Africa • Powered by Interledger Open Payments
           </p>
           <button
             type="button"
@@ -778,7 +921,7 @@ export default function App() {
             <span>Log Out</span>
           </button>
           <p className="text-[11px] text-slate-400">
-            Qpay Africa • Secured by Kora Rails
+            Qpay Africa • Powered by Interledger Open Payments
           </p>
         </footer>
       )}

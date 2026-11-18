@@ -12,13 +12,16 @@ export default function ReceiveView({ onBack, connectedUser, onUserUpdated }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [syncId, setSyncId] = useState(null);
   const [activeReference, setActiveReference] = useState(null);
+  const [incomingPaymentId, setIncomingPaymentId] = useState(null);
+  const [ilpDisplayAmount, setIlpDisplayAmount] = useState(null);
   const [qrPayload, setQrPayload] = useState('');
   const [settledPayment, setSettledPayment] = useState(null);
 
   const accountNumber = connectedUser?.accountNumber || '0234891102';
   const accountName = connectedUser?.name || 'Amara Nwosu';
-  const bankName = connectedUser?.bankName || 'Kora / Wema Bank';
+  const bankName = connectedUser?.bankName || 'Interledger Open Payments';
   const qpayTag = connectedUser?.qpayTag || '@user';
+  const paymentPointer = connectedUser?.paymentPointer || '$ilp.interledger-test.dev/qpay';
 
   const quickPresets = ['1000', '2500', '5000', '10000', '20000'];
   const pollTimerRef = useRef(null);
@@ -65,10 +68,10 @@ export default function ReceiveView({ onBack, connectedUser, onUserUpdated }) {
       } catch (e) {}
     };
 
-    // 1. Cross-Device Cloud Rail Polling (every 1.5 seconds)
+    // 1. Live Interledger Open Payments & Cross-Device Rail Polling (every 1.5 seconds)
     pollTimerRef.current = setInterval(async () => {
       try {
-        const settled = await checkInvoiceSettlementStatus(syncId, activeReference);
+        const settled = await checkInvoiceSettlementStatus(syncId, activeReference, incomingPaymentId);
         if (settled && (settled.status === 'PAID' || settled.status === 'SUCCESSFUL')) {
           handlePaymentSettled(settled);
         }
@@ -114,7 +117,7 @@ export default function ReceiveView({ onBack, connectedUser, onUserUpdated }) {
       }
       window.removeEventListener('storage', handleStorage);
     };
-  }, [step, syncId, activeReference, connectedUser, onUserUpdated]);
+  }, [step, syncId, activeReference, incomingPaymentId, connectedUser, onUserUpdated]);
 
   const handleGenerateQr = async (e) => {
     e?.preventDefault();
@@ -130,17 +133,22 @@ export default function ReceiveView({ onBack, connectedUser, onUserUpdated }) {
 
       setSyncId(result.syncId);
       setActiveReference(result.reference);
+      setIncomingPaymentId(result.incomingPaymentId || null);
+      setIlpDisplayAmount(result.ilpDisplayAmount || null);
       setQrPayload(result.qrPayload);
       setStep('show_qr');
     } catch (err) {
       // Fallback
-      const fallbackRef = 'KP_QPAY_' + Math.floor(100000 + Math.random() * 900000);
+      const fallbackRef = 'ILP_QPAY_' + Math.floor(100000 + Math.random() * 900000);
       setActiveReference(fallbackRef);
+      setIncomingPaymentId(null);
+      setIlpDisplayAmount(null);
       setQrPayload(JSON.stringify({
         app: 'Qpay',
-        type: 'korapay_invoice',
+        type: 'interledger_invoice',
         ref: fallbackRef,
         reference: fallbackRef,
+        paymentPointer,
         accountNumber,
         accountName,
         qpayTag,
@@ -170,7 +178,7 @@ export default function ReceiveView({ onBack, connectedUser, onUserUpdated }) {
 
         <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
           <ShieldCheck className="w-3.5 h-3.5" />
-          <span>Kora Virtual NUBAN</span>
+          <span>Interledger Open Payments</span>
         </div>
       </div>
 
@@ -262,7 +270,7 @@ export default function ReceiveView({ onBack, connectedUser, onUserUpdated }) {
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
                   <span>Zero-Account-Number Shield</span>
                 </span>
-                <span>Kora Vault Encrypted</span>
+                <span>Interledger Vault Encrypted</span>
               </div>
             </div>
 
@@ -340,9 +348,11 @@ export default function ReceiveView({ onBack, connectedUser, onUserUpdated }) {
             <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 text-[11px] text-emerald-700 font-medium">
               <span className="flex items-center gap-1">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Encrypted with Kora Rail</span>
+                <span>Encrypted with Interledger Rail</span>
               </span>
-              <span className="text-slate-400 font-normal">Auto-Crediting</span>
+              <span className="text-slate-400 font-normal">
+                {ilpDisplayAmount ? `ILP ${ilpDisplayAmount}` : 'Auto-Crediting'}
+              </span>
             </div>
           </div>
 

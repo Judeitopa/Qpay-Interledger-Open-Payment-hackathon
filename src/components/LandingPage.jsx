@@ -570,7 +570,7 @@ export default function LandingPage({ onLoginClick }) {
       <footer className="w-full py-6 px-6 sm:px-10 border-t border-slate-200/70 bg-[#F8FAFD]">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400">
           <span className="font-medium text-slate-500">Qpay Africa</span>
-          <span>Powered by Kora Virtual Account Infrastructure</span>
+          <span>Powered by Interledger Open Payments</span>
         </div>
       </footer>
     </div>

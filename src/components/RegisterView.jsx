@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, Building2, ArrowRight, ShieldCheck, ArrowLeft, Mail, Phone, AtSign, CheckCircle2, Sparkles, Lock, AlertCircle, Eye, EyeOff, Check } from 'lucide-react';
-import { provisionKorapayVirtualAccount, generateUniqueQpayTag } from '../utils/korapayVault';
+import { provisionInterledgerAccount, generateUniqueQpayTag } from '../utils/interledgerVault';
 import { findAccount, restoreAccountToActiveSession, saveAccount, hasRegisteredAccountType, getRecognizedAccountByType } from '../utils/accountStorage';
 import { DEFAULT_UNISEX_AVATAR } from '../utils/avatar';
 
@@ -194,8 +194,8 @@ export default function RegisterView({
       const finalTag = generateUniqueQpayTag(userName, selectedType);
       const fullEmail = `${emailPrefix.trim().toLowerCase()}@qpay.africa.com`;
 
-      // Provision Virtual Account in secure backend vault (maps unique tag to hidden Korapay NUBAN)
-      const vaultResult = provisionKorapayVirtualAccount({
+      // Provision Interledger Open Payments vault record mapped to unique Qpay tag
+      const vaultResult = provisionInterledgerAccount({
         name: userName,
         type: selectedType,
         qpayTag: finalTag,
@@ -209,6 +209,8 @@ export default function RegisterView({
         name: userName,
         qpayTag: vaultResult.qpayTag,
         vaultToken: vaultResult.vaultToken,
+        walletAddress: vaultResult.walletAddress,
+        paymentPointer: vaultResult.paymentPointer,
         internalVaultId: vaultResult.internalVaultId,
         email: fullEmail,
         phone: userPhone,
@@ -334,7 +336,7 @@ export default function RegisterView({
 
         {/* Footer */}
         <footer className="w-full text-center text-xs text-slate-400 pb-2">
-          © 2026 Qpay Africa • Kora Infrastructure
+          © 2026 Qpay Africa • Powered by Interledger Open Payments
         </footer>
 
       </div>
@@ -381,7 +383,7 @@ export default function RegisterView({
           )}
           <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
             <ShieldCheck className="w-4 h-4 text-emerald-500" />
-            <span className="hidden sm:inline">Secure Kora Onboarding</span>
+            <span className="hidden sm:inline">Secure Interledger Onboarding</span>
           </div>
         </div>
       </header>
@@ -459,7 +461,7 @@ export default function RegisterView({
               <div className="pt-2">
                 <span className="inline-flex items-center gap-1.5 text-xs text-slate-400">
                   <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                  <span>No 10-digit account numbers needed • Powered by Kora Rails</span>
+                  <span>No 10-digit account numbers needed • Powered by Interledger Open Payments</span>
                 </span>
               </div>
 
@@ -597,13 +599,13 @@ export default function RegisterView({
                     </div>
                     <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
                       <Lock className="w-2.5 h-2.5 text-slate-400" />
-                      <span>Kora Vault</span>
+                      <span>Interledger Vault</span>
                     </span>
                   </div>
 
                   <p className="text-[10px] text-slate-500 leading-tight">
                     {name.trim()
-                      ? `Unique tag mapped to your Kora NUBAN virtual account.`
+                      ? `Unique tag mapped to your Interledger Open Payments wallet.`
                       : `Enter your name above to automatically generate your verified unique tag.`}
                   </p>
                 </div>
@@ -743,7 +745,7 @@ export default function RegisterView({
                     className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-[0.99]"
                   >
                     {isLoading ? (
-                      <span>Assigning Kora Rails...</span>
+                      <span>Assigning Interledger Rails...</span>
                     ) : (
                       <>
                         <span>Complete Registration</span>
@@ -772,7 +774,7 @@ export default function RegisterView({
                 {/* Privacy footnote */}
                 <p className="text-[11px] text-slate-400 text-center flex items-center justify-center gap-1.5 pt-1">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>NUBAN secured in Kora vault</span>
+                  <span>Wallet secured on Interledger Open Payments</span>
                 </p>
 
               </form>
@@ -785,7 +787,7 @@ export default function RegisterView({
 
       {/* Footer */}
       <footer className="w-full py-4 text-center text-xs text-slate-400 border-t border-slate-100 bg-white/40">
-        © 2026 Qpay Africa • Powered by Kora Virtual Account Infrastructure
+        © 2026 Qpay Africa • Powered by Interledger Open Payments
       </footer>
 
     </div>

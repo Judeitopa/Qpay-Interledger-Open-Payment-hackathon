@@ -226,7 +226,7 @@ export function exportCustomerProfilePdf(customer, businessName = 'Amara Venture
       </table>
 
       <div class="footer">
-        <span>Verified by Qpay CRM & Kora Enterprise Infrastructure</span>
+        <span>Verified by Qpay CRM & Interledger Open Payments</span>
         <span>Confidential • Internal Business Use Only</span>
       </div>
 
@@ -411,7 +411,7 @@ export function exportLeaderboardPdf(leaderboard, businessName = 'Amara Ventures
       </table>
 
       <div class="footer">
-        <span>Verified by Qpay CRM & Kora Enterprise Infrastructure</span>
+        <span>Verified by Qpay CRM & Interledger Open Payments</span>
         <span>Page 1 of 1 • Confidential Commercial Data</span>
       </div>
 

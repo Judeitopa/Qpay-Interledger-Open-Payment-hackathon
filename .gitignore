@@ -23,5 +23,10 @@ dist-ssr
 *.sln
 *.sw?
 
+# Environment variables (never commit private keys)
+.env
+.env.local
+.env.*.local
+
 # Vercel
 .vercel
