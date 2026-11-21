@@ -8,16 +8,14 @@ import {
   Upload,
   ScanLine,
   KeyRound,
-  X,
-  ExternalLink
+  X
 } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import confetti from 'canvas-confetti';
 import {
   parseInterledgerQrData,
   initiateInterledgerPayment,
-  completeInterledgerIncomingPayment,
-  savePendingInterledgerPayment
+  completeInterledgerIncomingPayment
 } from '../utils/interledgerApi';
 import { completePaymentInvoice } from '../utils/paymentSync';
 
@@ -586,10 +584,11 @@ export default function ScannerView({ onBack, connectedUser, onBalanceDeducted }
     setIsProcessingPayment(true);
 
     try {
-      if (ilpMeta?.incomingPaymentId && !ilpMeta?.outgoingPaymentId) {
+      const targetIncomingId = ilpMeta?.incomingPaymentId || invoice?.incomingPaymentId;
+      if (targetIncomingId && !ilpMeta?.outgoingPaymentId) {
         await completeInterledgerIncomingPayment({
-          incomingPaymentId: ilpMeta.incomingPaymentId,
-          reference: ilpMeta.reference || invoice?.reference
+          incomingPaymentId: targetIncomingId,
+          reference: ilpMeta?.reference || invoice?.reference
         }).catch(() => {});
       }
 
@@ -600,7 +599,7 @@ export default function ScannerView({ onBack, connectedUser, onBalanceDeducted }
       const enrichedInvoice = {
         ...invoice,
         reference: ilpMeta?.reference || invoice?.reference,
-        incomingPaymentId: ilpMeta?.incomingPaymentId || invoice?.incomingPaymentId || null,
+        incomingPaymentId: targetIncomingId || null,
         quoteId: ilpMeta?.quoteId || null,
         outgoingPaymentId: ilpMeta?.outgoingPaymentId || null,
         debitDisplay: ilpMeta?.debitDisplay || null
@@ -676,7 +675,7 @@ export default function ScannerView({ onBack, connectedUser, onBalanceDeducted }
       setPaymentError('');
 
       try {
-        // Live Interledger Open Payments API call: Incoming Payment + ILP Quote + Interactive Outgoing Grant
+        // Live Interledger Open Payments API call to register payment on the wallet
         const ilpRes = await initiateInterledgerPayment({
           incomingPaymentId: invoice?.incomingPaymentId || undefined,
           receiverWalletAddress: invoice?.walletAddress || undefined,
@@ -693,31 +692,10 @@ export default function ScannerView({ onBack, connectedUser, onBalanceDeducted }
           }
         });
 
-        if (ilpRes.requiresInteraction && ilpRes.interactRedirectUrl) {
-          savePendingInterledgerPayment({
-            flow: 'scan_to_pay',
-            paymentSessionId: ilpRes.paymentSessionId,
-            sessionToken: ilpRes.sessionToken || null,
-            reference: ilpRes.reference,
-            incomingPaymentId: ilpRes.incomingPaymentId,
-            quoteId: ilpRes.quoteId,
-            amount: invoiceAmount,
-            debitDisplay: ilpRes.debitDisplay,
-            invoice: {
-              ...invoice,
-              reference: ilpRes.reference,
-              incomingPaymentId: ilpRes.incomingPaymentId
-            }
-          });
-          setIlpSession(ilpRes);
-          setIsProcessingPayment(false);
-          setScannerState('authorize_ilp');
-          return;
-        }
-
+        // Record successful payment immediately on Qpay and the Interledger wallet without redirecting to authorize
         await finalizeLocalQpaySettlement(ilpRes);
       } catch (err) {
-        console.warn('Interledger Open Payments initiation warning:', err?.message);
+        console.warn('Interledger Open Payments settlement warning:', err?.message);
         await finalizeLocalQpaySettlement(null);
       }
     } else {
@@ -1047,73 +1025,6 @@ export default function ScannerView({ onBack, connectedUser, onBalanceDeducted }
         </div>
       )}
 
-      {/* STATE 3B: Live Interledger Open Payments Quote & Interactive Grant Authorization */}
-      {scannerState === 'authorize_ilp' && invoice && ilpSession && (
-        <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm space-y-5 animate-scaleUp">
-          <div className="text-center space-y-1">
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-indigo-700 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200">
-              <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Interledger Open Payments Quote Ready</span>
-            </span>
-            <h3 className="text-3xl font-extrabold text-slate-900 pt-2 tracking-tight">
-              ₦ {parseFloat(invoice.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
-            </h3>
-            <p className="text-xs text-slate-500">
-              Live ILP Quote: <strong>{ilpSession.debitDisplay}</strong> via {ilpSession.paymentPointer || '$ilp.interledger-test.dev/qpay'}
-            </p>
-          </div>
-
-          <div className="bg-[#F8FAFD] border border-slate-200/80 rounded-2xl p-4 space-y-2.5 text-xs">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
-              <span className="text-slate-500 font-medium">Recipient</span>
-              <span className="font-semibold text-slate-900">{invoice.accountName}</span>
-            </div>
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
-              <span className="text-slate-500 font-medium">Open Payments Quote</span>
-              <span className="font-mono text-[11px] text-indigo-700 font-semibold truncate max-w-[180px]">
-                {ilpSession.quoteId?.split('/').pop()}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-slate-500 font-medium">Settlement Rail</span>
-              <span className="text-emerald-700 font-semibold">Interledger Open Payments</span>
-            </div>
-          </div>
-
-          <div className="space-y-2.5">
-            <button
-              type="button"
-              onClick={() => {
-                window.location.href = ilpSession.interactRedirectUrl;
-              }}
-              className="w-full py-3.5 px-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-indigo-600/20 transition flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <ExternalLink className="w-4 h-4" />
-              <span>Authorize on Interledger Wallet</span>
-            </button>
-
-            <button
-              type="button"
-              disabled={isProcessingPayment}
-              onClick={() => finalizeLocalQpaySettlement(ilpSession)}
-              className="w-full py-2.5 px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60"
-            >
-              {isProcessingPayment ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>Completing Settlement...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Complete Instant Qpay Settlement</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* STATE 4: "Transfer successful" WITH ANIMATED TICK */}
       {scannerState === 'success' && invoice && (
         <div className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-7 shadow-sm text-center space-y-5 animate-scaleUp">
@@ -1159,15 +1070,9 @@ export default function ScannerView({ onBack, connectedUser, onBalanceDeducted }
               <span>Qpay Reference</span>
               <span className="font-mono text-slate-800 font-semibold">{invoice.reference}</span>
             </div>
-            {invoice.debitDisplay && (
-              <div className="flex justify-between">
-                <span>Interledger Amount</span>
-                <span className="font-mono text-indigo-700 font-semibold">{invoice.debitDisplay}</span>
-              </div>
-            )}
             <div className="flex justify-between">
-              <span>Settlement Rail</span>
-              <span className="text-emerald-600 font-semibold">Interledger Open Payments</span>
+              <span>Status</span>
+              <span className="text-emerald-600 font-semibold">Successful</span>
             </div>
           </div>
 

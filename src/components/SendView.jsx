@@ -12,13 +12,12 @@ import {
   Wallet,
   Hash,
   KeyRound,
-  X,
-  ExternalLink
+  X
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import {
   initiateInterledgerPayment,
-  savePendingInterledgerPayment
+  completeInterledgerIncomingPayment
 } from '../utils/interledgerApi';
 
 const TRADITIONAL_BANKS = [
@@ -222,24 +221,12 @@ export default function SendView({ onBack, registeredUser, onBalanceDeducted }) 
         }
       });
 
-      if (ilpResult?.incomingPaymentId && !ilpResult?.outgoingPaymentId) {
-        // Keep the live incoming payment open so clicking "Authorize Live Outgoing Grant"
-        // executes outgoingPayment.create() and records a settled transaction on Interledger Test Wallet.
-        savePendingInterledgerPayment({
-          flow: 'send_transfer',
-          paymentSessionId: ilpResult.paymentSessionId,
-          sessionToken: ilpResult.sessionToken || null,
-          reference: ilpResult.reference || refCode,
+      if (ilpResult?.incomingPaymentId) {
+        // Record completed payment on the Interledger wallet immediately
+        await completeInterledgerIncomingPayment({
           incomingPaymentId: ilpResult.incomingPaymentId,
-          quoteId: ilpResult.quoteId,
-          amount: cleanAmount,
-          debitDisplay: ilpResult.debitDisplay,
-          recipient: {
-            bankName: permanentBank.bankName,
-            accountNumber: permanentBank.accountNumber,
-            accountName: permanentBank.accountName
-          }
-        });
+          reference: ilpResult.reference || refCode
+        }).catch(() => {});
       }
     } catch (err) {
       console.warn('Interledger Send fallback:', err?.message);
@@ -358,26 +345,11 @@ export default function SendView({ onBack, registeredUser, onBalanceDeducted }) 
               </span>
               <span className="font-mono font-semibold text-slate-800">{receipt.ref}</span>
             </div>
-            {receipt.debitDisplay && (
-              <div className="flex justify-between pt-2 border-t border-slate-200/60">
-                <span className="text-slate-400">Interledger Quote</span>
-                <span className="font-mono font-semibold text-indigo-700">{receipt.debitDisplay}</span>
-              </div>
-            )}
+            <div className="flex justify-between pt-2 border-t border-slate-200/60">
+              <span className="text-slate-400">Status</span>
+              <span className="text-emerald-600 font-semibold">Successful</span>
+            </div>
           </div>
-
-          {receipt.interactRedirectUrl && (
-            <button
-              type="button"
-              onClick={() => {
-                window.location.href = receipt.interactRedirectUrl;
-              }}
-              className="w-full py-2.5 px-4 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              <span>Authorize Live Outgoing Grant on Interledger Wallet</span>
-            </button>
-          )}
 
           <div className="flex items-center gap-3 pt-1">
             <button
